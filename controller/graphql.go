@@ -1239,7 +1239,14 @@ func init() {
 					Type:        dataType,
 					Description: fmt.Sprintf("%s associated with event", dataType.Name),
 					Resolve: eventFieldResolveFunc(func(_ *controllerAPI, event *ct.Event) (interface{}, error) {
-						return decodeEventObjectData(event.ObjectType, event.Data)
+						data, err := decodeEventObjectData(event.ObjectType, event.Data)
+						if event.ObjectType == ct.EventTypeReleaseDeletion {
+							rd := data.(*ct.ReleaseDeletionEvent).ReleaseDeletion
+							if rd.AppID == "" && event.AppID != "" {
+								rd.AppID = event.AppID
+							}
+						}
+						return data, err
 					}),
 				},
 			},
@@ -1421,7 +1428,7 @@ func init() {
 				Type:        releaseObject,
 				Description: "Release being deleted",
 				Resolve: releaseDeletionFieldResolveFunc(func(api *controllerAPI, rd *ct.ReleaseDeletion) (interface{}, error) {
-					return api.releaseRepo.Get(rd.ReleaseID)
+					return api.releaseRepo.GetDeleted(rd.ReleaseID)
 				}),
 			},
 			"remaining_apps": &graphql.Field{

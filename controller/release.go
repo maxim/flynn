@@ -117,6 +117,11 @@ func (r *ReleaseRepo) Get(id string) (interface{}, error) {
 	return scanRelease(row)
 }
 
+func (r *ReleaseRepo) GetDeleted(id string) (interface{}, error) {
+	row := r.db.QueryRow("release_select_deleted", id)
+	return scanRelease(row)
+}
+
 func releaseList(rows *pgx.Rows) ([]*ct.Release, error) {
 	var releases []*ct.Release
 	for rows.Next() {

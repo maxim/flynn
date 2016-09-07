@@ -2,7 +2,6 @@ package graphqltypes
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	ct "github.com/flynn/flynn/controller/types"
@@ -70,6 +69,45 @@ func (r *Release) ToStandardType() *ct.Release {
 		Meta:             r.Meta,
 		Processes:        r.Processes,
 		CreatedAt:        r.CreatedAt,
+	}
+}
+
+type ReleaseDeletion struct {
+	App           *App     `json:"app"`
+	Release       *Release `json:"release"`
+	RemainingApps []*App   `json:"remaining_apps"`
+	DeletedFiles  []string `json:"deleted_files"`
+}
+
+func (d *ReleaseDeletion) ToStandardType() *ct.ReleaseDeletion {
+	var appID, releaseID string
+	if d.App != nil {
+		appID = d.App.ID
+	}
+	if d.Release != nil {
+		releaseID = d.Release.ID
+	}
+	remainingApps := make([]string, len(d.RemainingApps))
+	for i, app := range d.RemainingApps {
+		remainingApps[i] = app.ID
+	}
+	return &ct.ReleaseDeletion{
+		AppID:         appID,
+		ReleaseID:     releaseID,
+		RemainingApps: remainingApps,
+		DeletedFiles:  d.DeletedFiles,
+	}
+}
+
+type ReleaseDeletionEvent struct {
+	ReleaseDeletion *ReleaseDeletion `json:"release_deletion"`
+	Error           string           `json:"error"`
+}
+
+func (e *ReleaseDeletionEvent) ToStandardType() *ct.ReleaseDeletionEvent {
+	return &ct.ReleaseDeletionEvent{
+		ReleaseDeletion: e.ReleaseDeletion.ToStandardType(),
+		Error:           e.Error,
 	}
 }
 
@@ -432,9 +470,20 @@ func (e *Event) ToStandardType() *ct.Event {
 			panic(err)
 		}
 		var err error
-		de := deploymentEvent.ToStandardType()
-		fmt.Printf("json: %s\nbefore: %#v\nafter: %#v\n", string(data), deploymentEvent, de)
-		data, err = json.Marshal(de)
+		data, err = json.Marshal(deploymentEvent.ToStandardType())
+		if err != nil {
+			// TODO(jvatic): Ditto on returning error
+			panic(err)
+		}
+	}
+	if e.ObjectType == ct.EventTypeReleaseDeletion {
+		var releaseDeletionEvent *ReleaseDeletionEvent
+		if err := json.Unmarshal(data, &releaseDeletionEvent); err != nil {
+			// TODO(jvatic): Refactor to allow this method to return an error
+			panic(err)
+		}
+		var err error
+		data, err = json.Marshal(releaseDeletionEvent.ToStandardType())
 		if err != nil {
 			// TODO(jvatic): Ditto on returning error
 			panic(err)

@@ -898,6 +898,23 @@ func (c *Client) ListEvents(opts ct.ListEventsOptions) ([]*ct.Event, error) {
 						error
 					}
 				}
+				... on EventReleaseDeletion {
+					data {
+						release_deletion {
+							app {
+								id
+							}
+							release {
+								id
+							}
+							remaining_apps {
+								id
+							}
+							deleted_files
+						}
+						error
+					}
+				}
 				created_at
 			}
 		}

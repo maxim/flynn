@@ -542,7 +542,14 @@ func (s *S) TestGetEvents(c *C) {
 		c.Assert(err, IsNil)
 		data2, err := decodeEventObjectData(e2.ObjectType, e2.Data)
 		c.Assert(err, IsNil)
-		c.Assert(data1, DeepEquals, data2)
+		if e1.ObjectType == ct.EventTypeReleaseDeletion {
+			rde1 := data1.(*ct.ReleaseDeletionEvent)
+			rde2 := data2.(*ct.ReleaseDeletionEvent)
+			c.Assert(rde1.Error, Equals, rde2.Error)
+			c.Assert(rde1.ReleaseDeletion, DeepEquals, rde2.ReleaseDeletion)
+		} else {
+			c.Assert(data1, DeepEquals, data2)
+		}
 	}
 
 	// EventTypeApp [create]
@@ -625,7 +632,6 @@ func (s *S) TestGetEvents(c *C) {
 
 	// TODO(jvatic): EventTypeJob
 	// TODO(jvatic): EventTypeScale
-	// TODO(jvatic): EventTypeReleaseDeletion
 	// TODO(jvatic): EventTypeArtifact
 	// TODO(jvatic): EventTypeProvider
 	// TODO(jvatic): EventTypeResource
@@ -638,6 +644,24 @@ func (s *S) TestGetEvents(c *C) {
 	// TODO(jvatic): EventTypeAppGarbageCollection
 
 	// TODO(jvatic): EventTypeApp [update]
+
+	// EventTypeReleaseDeletion
+	nextRelease := s.createTestRelease(c, s.c, &ct.Release{})
+	c.Assert(s.c.SetAppRelease(app.ID, nextRelease.ID), IsNil)
+	_, err = s.c.DeleteRelease(app.ID, release.ID)
+	c.Assert(err, IsNil)
+	s.withEachClient(func(client controller.Client) {
+		events, err := client.ListEvents(ct.ListEventsOptions{
+			ObjectTypes: []ct.EventType{ct.EventTypeReleaseDeletion},
+			AppID:       app.ID,
+		})
+		c.Assert(err, IsNil)
+		c.Assert(len(events), Equals, 1)
+
+		event, err := s.c.GetEvent(events[0].ID)
+		c.Assert(err, IsNil)
+		assertEventsEqual(event, events[0])
+	})
 
 	// EventTypeAppDeletion
 	c.Assert(createEvent(s.db.Exec, &ct.Event{
